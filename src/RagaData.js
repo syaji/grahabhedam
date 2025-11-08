@@ -195,7 +195,6 @@ export const RagaStore = {
   "S R2 M1 P N2": "Bhuvanagāndhāri",
   "N2 S G2 M1 P N2": "Dhanashree",
   "S G2 M1 P D1 P N2": "Dilipika Vasantha",
-  "S G2 M1 D1 N2": "Hindolam",
   "S G2 M1 P D1 N2 D1": "Hindolavasanta",
   "S G2 M1 P D1 P": "Indughantarava",
   "S R2 G2 P D1": "Kātyāyani",
@@ -490,4 +489,10 @@ export const RagaStore = {
   "S G3 M2 P D2 P": "Nāgagiri"
   }
 };
+
+// Create reverse lookup: name → canonical scale
+RagaStore.reverseLookup = {};
+for (const [scale, name] of Object.entries(RagaStore.canonicalRagaLookup)) {
+  RagaStore.reverseLookup[name] = scale;
+}
 

@@ -141,19 +141,22 @@ export const GrahabhedamEngine = (() => {
         canonicalKey += " S";
       }
 
-console.log("Lookup Key:", canonicalKey);
-console.log("Store has:", store);
-console.log("Available keys:", Object.keys(store.canonicalRagaLookup || {}));
-
 
       const name =
         (store?.canonicalRagaLookup && store.canonicalRagaLookup[canonicalKey]) ||
         "Unknown";
 
-      results.push({
-        name,
-        notes: display
-      });
+let finalNotes = display;
+if (name !== "Unknown" && store.reverseLookup && store.reverseLookup[name]) {
+  finalNotes = store.reverseLookup[name];
+}
+
+results.push({
+  name,
+  notes: finalNotes
+});
+
+
     }
 
     return results;
