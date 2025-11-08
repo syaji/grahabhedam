@@ -1,6 +1,21 @@
 // audioPlayer.js
 let audioCtx;
 
+// iOS audio unlock helper — plays a silent buffer once on first touch
+export function unlockAudioForiOS() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+
+  const ctx = new AudioCtx();
+  const buffer = ctx.createBuffer(1, 1, 22050);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+
+  if (ctx.state === "suspended") ctx.resume();
+  try { source.start(0); } catch {}
+}
+
 function getAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();

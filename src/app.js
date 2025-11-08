@@ -1,17 +1,13 @@
 import { playRaga } from './audioPlayer.js';
 import { RagaStore } from "./RagaData.js";
 import { GrahabhedamEngine } from "./GrahabhedamEngine.js";
+import { playRaga, unlockAudioForiOS } from './audioPlayer.js';
 
-document.addEventListener("DOMContentLoaded", () => {
-  // 🎵 iOS Safari audio unlock
-  document.addEventListener(
-    "touchstart",
-    () => {
-      const ctx = window.AudioContext ? new AudioContext() : new webkitAudioContext();
-      if (ctx.state === "suspended") ctx.resume();
-    },
-    { once: true }
-  );
+
+// 🎵 iOS Safari audio unlock — play silent buffer on first tap
+if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+  document.addEventListener("touchstart", unlockAudioForiOS, { once: true });
+}
 
   const searchInput = document.getElementById("ragaSearch");
   const dropdown = document.getElementById("dropdown");
