@@ -3,6 +3,16 @@ import { RagaStore } from "./RagaData.js";
 import { GrahabhedamEngine } from "./GrahabhedamEngine.js";
 
 document.addEventListener("DOMContentLoaded", () => {
+  // 🎵 iOS Safari audio unlock
+  document.addEventListener(
+    "touchstart",
+    () => {
+      const ctx = window.AudioContext ? new AudioContext() : new webkitAudioContext();
+      if (ctx.state === "suspended") ctx.resume();
+    },
+    { once: true }
+  );
+
   const searchInput = document.getElementById("ragaSearch");
   const dropdown = document.getElementById("dropdown");
   const selectedInfo = document.getElementById("selectedInfo");
