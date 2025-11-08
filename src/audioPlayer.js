@@ -1,6 +1,19 @@
 // audioPlayer.js
+let audioCtx;
+
+function getAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // iOS Safari fix — resume if it’s suspended
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
 export function playRaga(pattern, baseFreq = 261.63) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const ctx = getAudioContext();  // 👈 use the resumed context
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
 
