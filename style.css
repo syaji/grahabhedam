@@ -1,0 +1,83 @@
+/* 🎵 Grahabhedam Web Styles */
+
+body {
+  font-family: system-ui, sans-serif;
+  background-color: #f9fafc;
+  color: #222;
+  margin: 0;
+  padding: 0;
+}
+
+button.play-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+button.play-btn:hover {
+  background: #0056b3;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+hr {
+  border: none;
+  height: 1px;
+  background: #ddd;
+  margin: 8px 0;
+}
+.play-btn {
+  background: #1e88e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.play-btn:hover {
+  background: #0d47a1;
+}
+
+.result-card {
+  background: rgba(255, 255, 255, 0.9);
+  color: #003366;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.play-btn {
+  background: #1e88e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: 8px;
+}
+
+.play-btn:hover {
+  background: #0d47a1;
+}
+
