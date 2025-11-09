@@ -1,27 +1,41 @@
 // ✅ Guaranteed audible on iOS, Android, and desktop Safari
 let audioContext;
 
-// 🔊 iOS Safari fix — keep a persistent silent <audio> element to route to speaker
+// 🔊 iOS Safari speaker unlock – audible micro-loop version
 if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-  let silentEl;
-  const enableSpeaker = () => {
+  let speakerUnlocked = false;
+
+  const unlockIOSAudio = () => {
+    if (speakerUnlocked) return;
+    speakerUnlocked = true;
     try {
-      if (!silentEl) {
-        silentEl = document.createElement("audio");
-        silentEl.src =
-          "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA...";
-        silentEl.loop = true;           // ✅ keeps audio route alive
-        silentEl.volume = 0.0001;       // inaudible but nonzero
-        document.body.appendChild(silentEl);
+      // Create a short buffer with an audible (but quiet) tone
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const sampleRate = ctx.sampleRate;
+      const buffer = ctx.createBuffer(1, sampleRate * 0.05, sampleRate); // 50 ms
+      const data = buffer.getChannelData(0);
+      const freq = 880; // A5
+      for (let i = 0; i < data.length; i++) {
+        data[i] = 0.05 * Math.sin((2 * Math.PI * freq * i) / sampleRate);
       }
-      silentEl.play().then(() => {
-        console.log("📱 iOS speaker route active (persistent)");
-      }).catch(err => console.warn("Speaker play() blocked:", err));
+
+      // Turn buffer into a looping <audio> element via MediaStream
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(ctx.destination);
+      source.start(0);
+
+      // keep context alive
+      window._iosAudioCtx = ctx;
+      console.log("📱 iOS speaker unlocked via micro-tone loop");
     } catch (err) {
-      console.warn("Speaker routing setup failed", err);
+      console.warn("iOS speaker unlock failed:", err);
     }
   };
-  document.addEventListener("touchstart", enableSpeaker, { once: true });
+
+  // must run on user gesture
+  document.addEventListener("touchstart", unlockIOSAudio, { once: true });
 }
 
 
