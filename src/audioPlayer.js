@@ -1,26 +1,26 @@
 // ✅ Guaranteed audible on iOS, Android, and desktop Safari
 let audioContext;
 
-// 🔊 iOS Safari speaker routing fix
+// 🔊 iOS Safari fix — keep a persistent silent <audio> element to route to speaker
 if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+  let silentEl;
   const enableSpeaker = () => {
     try {
-      const silent = document.createElement("audio");
-      // short silent MP3 frame to trigger speaker path
-      silent.src =
-        "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA...";
-      silent.volume = 0.001;
-      document.body.appendChild(silent);
-      silent.play().then(() => {
-        console.log("📱 iOS speaker route activated");
-        silent.remove();
-      }).catch(err => console.warn("Speaker route play() blocked:", err));
+      if (!silentEl) {
+        silentEl = document.createElement("audio");
+        silentEl.src =
+          "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA...";
+        silentEl.loop = true;           // ✅ keeps audio route alive
+        silentEl.volume = 0.0001;       // inaudible but nonzero
+        document.body.appendChild(silentEl);
+      }
+      silentEl.play().then(() => {
+        console.log("📱 iOS speaker route active (persistent)");
+      }).catch(err => console.warn("Speaker play() blocked:", err));
     } catch (err) {
-      console.warn("iOS speaker routing setup failed", err);
+      console.warn("Speaker routing setup failed", err);
     }
   };
-
-  // must attach to first touch or tap
   document.addEventListener("touchstart", enableSpeaker, { once: true });
 }
 
