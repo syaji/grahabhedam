@@ -1,18 +1,27 @@
 // ✅ Guaranteed audible on iOS, Android, and desktop Safari
 let audioContext;
 
-// 🩺 iOS Safari fix: ensure speaker output and correct category
-if (typeof window.webkitAudioContext !== "undefined") {
-  try {
-    // Force AudioContext to use speaker instead of earpiece
-    window.AudioContext = window.webkitAudioContext;
-    const audioEl = document.createElement("audio");
-    audioEl.src = "data:audio/mp3;base64,";
-    audioEl.play().catch(() => {}); // harmless; helps iOS route audio to speaker
-    console.log("🔊 iOS AudioContext prepared for speaker playback");
-  } catch (e) {
-    console.warn("Speaker routing setup failed:", e);
-  }
+// 🔊 iOS Safari speaker routing fix
+if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+  const enableSpeaker = () => {
+    try {
+      const silent = document.createElement("audio");
+      // short silent MP3 frame to trigger speaker path
+      silent.src =
+        "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA...";
+      silent.volume = 0.001;
+      document.body.appendChild(silent);
+      silent.play().then(() => {
+        console.log("📱 iOS speaker route activated");
+        silent.remove();
+      }).catch(err => console.warn("Speaker route play() blocked:", err));
+    } catch (err) {
+      console.warn("iOS speaker routing setup failed", err);
+    }
+  };
+
+  // must attach to first touch or tap
+  document.addEventListener("touchstart", enableSpeaker, { once: true });
 }
 
 
