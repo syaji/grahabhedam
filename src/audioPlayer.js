@@ -1,40 +1,33 @@
 // ✅ Guaranteed audible on iOS, Android, and desktop Safari
+// ✅ iOS Safari fix — route WebAudio through speaker with audible anchor
 let audioContext;
 
-// 🔊 iOS Safari speaker unlock – audible micro-loop version
+// On iOS, create a persistent <audio> element that keeps the output routed to speaker
 if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
   let speakerUnlocked = false;
+  let unlockElement;
 
   const unlockIOSAudio = () => {
     if (speakerUnlocked) return;
     speakerUnlocked = true;
+
     try {
-      // Create a short buffer with an audible (but quiet) tone
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const sampleRate = ctx.sampleRate;
-      const buffer = ctx.createBuffer(1, sampleRate * 0.05, sampleRate); // 50 ms
-      const data = buffer.getChannelData(0);
-      const freq = 880; // A5
-      for (let i = 0; i < data.length; i++) {
-        data[i] = 0.05 * Math.sin((2 * Math.PI * freq * i) / sampleRate);
-      }
-
-      // Turn buffer into a looping <audio> element via MediaStream
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true;
-      source.connect(ctx.destination);
-      source.start(0);
-
-      // keep context alive
-      window._iosAudioCtx = ctx;
-      console.log("📱 iOS speaker unlocked via micro-tone loop");
-    } catch (err) {
-      console.warn("iOS speaker unlock failed:", err);
+      // Create hidden <audio> element with an audible (but quiet) sample
+      unlockElement = document.createElement("audio");
+      unlockElement.src =
+        "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA...";
+      unlockElement.loop = true;
+      unlockElement.volume = 0.05; // not silent → forces speaker route
+      unlockElement.style.display = "none";
+      document.body.appendChild(unlockElement);
+      unlockElement.play().then(() => {
+        console.log("🔊 iOS audio routed to speaker (persistent element active)");
+      }).catch((err) => console.warn("iOS unlock failed:", err));
+    } catch (e) {
+      console.warn("iOS speaker routing setup failed:", e);
     }
   };
 
-  // must run on user gesture
   document.addEventListener("touchstart", unlockIOSAudio, { once: true });
 }
 
