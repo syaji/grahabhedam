@@ -1,4 +1,26 @@
 // ✅ Guaranteed audible on iOS, Android, and desktop Safari
+let audioContext;
+
+export function getAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioContext;
+}
+
+// 🧩 Unlock audio for iOS
+export function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx.state === "suspended") {
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    ctx.resume().then(() => console.log("🔓 Audio unlocked for iOS"));
+  }
+}
+
 
 export function playRaga(scaleString) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;

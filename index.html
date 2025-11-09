@@ -106,7 +106,11 @@
 <script type="module">
   import { RagaStore } from './src/RagaData.js';
   import { GrahabhedamEngine } from './src/GrahabhedamEngine.js';
-  import { playRaga } from './src/audioPlayer.js';
+  import { playRaga, unlockAudio } from './src/audioPlayer.js';
+
+
+document.body.addEventListener("touchstart", unlockAudio, { once: true });
+
 
   window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('ragaSearch');
