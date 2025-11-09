@@ -1,101 +1,97 @@
-// audioPlayer.js
-let audioCtx;
+// 🎵 audioPlayer.js — works on iOS, Android, desktop
 
-// iOS audio unlock helper — plays a silent buffer once on first touch
+let globalCtx = null;
+
+// iOS audio unlock helper
 export function unlockAudioForiOS() {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) return;
-
-  const ctx = new AudioCtx();
-  const buffer = ctx.createBuffer(1, 1, 22050);
-  const source = ctx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(ctx.destination);
-
-  if (ctx.state === "suspended") ctx.resume();
-  try { source.start(0); } catch {}
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContextClass();
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start(0);
+    ctx.close();
+    console.log("✅ iOS audio unlocked");
+  } catch (e) {
+    console.warn("Audio unlock failed:", e);
+  }
 }
 
-
-let sharedCtx = null;
-
-export function getAudioContext() {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) {
-    alert("Web Audio not supported on this device");
-    return null;
+// Main playback
+export async function playRaga(scaleString) {
+  // lazily unlock context for Safari
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!globalCtx || globalCtx.state === "closed") {
+    globalCtx = new AudioContextClass();
   }
-  if (!sharedCtx) {
-    sharedCtx = new AudioCtx();
-    if (sharedCtx.state === "suspended") {
-      const resume = () => {
-        sharedCtx.resume();
-        document.removeEventListener("touchstart", resume);
-      };
-      document.addEventListener("touchstart", resume);
-    }
-  }
-  return sharedCtx;
-}
 
+  const ctx = globalCtx;
 
-export function playRaga(pattern, baseFreq = 261.63) {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  if (ctx.state === "suspended") ctx.resume();
-
-  // Carnatic → Western semitone map
+  // Map Carnatic notes → semitone offsets
   const map = {
     S: 0,
-    R1: 1, R2: 2, R3: 3,
-    G2: 3, G3: 4,
+    R1: 1, R2: 2, R3: 3, G2: 3, G3: 4,
     M1: 5, M2: 6,
     P: 7,
-    D1: 8, D2: 9, D3: 10,
-    N2: 10, N3: 11,
+    D1: 8, D2: 9, D3: 10, N2: 10, N3: 11
   };
 
-  const swaras = pattern.trim().split(/\s+/);
-  const dur = 0.4; // seconds per note
-  let t = ctx.currentTime;
+  const notes = scaleString.trim().split(/\s+/);
+  const baseFreq = 261.63; // Sa = Middle C
+  const duration = 0.5;
+  let current = ctx.currentTime;
 
-  // ✅ Build full ārohaṇa–avarōhaṇa sequence with repeated top S
-  const totalNotes = [
-    ...swaras,
-    ...swaras.slice().reverse() // repeat top S for descent
-  ];
+  // Create & start tones *synchronously* within click gesture
+  for (const swara of notes) {
+    const semi = map[swara];
+    if (semi === undefined) continue;
 
-  totalNotes.forEach((s, i) => {
-    const semi = map[s];
-    if (semi === undefined) return;
+    // higher Sa (wrap-around) for ending S
+    const freq = (swara === "S" && current !== ctx.currentTime)
+      ? baseFreq * 2
+      : baseFreq * Math.pow(2, semi / 12);
 
-    const isLastOfAsc = (i === swaras.length - 1);
-    const isDescending = (i >= swaras.length);
-    let octaveOffset = 0;
-
-    if (isLastOfAsc && s === "S") octaveOffset = 12; // top S ↑
-    if (isDescending && s === "S") octaveOffset = 12; // start of descent stays high
-    if (isDescending && i === totalNotes.length - 1) octaveOffset = 0; // final S base octave
-
-    const freq = baseFreq * Math.pow(2, (semi + octaveOffset) / 12);
-
-    // 🕒 Each note gets its own oscillator and gain
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
     osc.type = "sine";
-    osc.frequency.setValueAtTime(freq, t);
-
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.15, t + 0.05);
-    gain.gain.linearRampToValueAtTime(0.12, t + dur - 0.05);
-    gain.gain.linearRampToValueAtTime(0, t + dur);
+    gain.gain.setValueAtTime(0.9, current);
+    gain.gain.exponentialRampToValueAtTime(0.001, current + duration);
 
     osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + dur);
+    osc.frequency.setValueAtTime(freq, current);
 
-    t += dur;
-  });
+    osc.start(current);
+    osc.stop(current + duration);
+    current += duration * 1.05;
+  }
+
+  // Avarohana — play reverse with top S repeated
+  const reversed = [...notes].reverse();
+  for (const swara of reversed) {
+    const semi = map[swara];
+    if (semi === undefined) continue;
+
+    const freq = (swara === "S" && current !== ctx.currentTime)
+      ? baseFreq * 2
+      : baseFreq * Math.pow(2, semi / 12);
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.9, current);
+    gain.gain.exponentialRampToValueAtTime(0.001, current + duration);
+
+    osc.connect(gain).connect(ctx.destination);
+    osc.frequency.setValueAtTime(freq, current);
+
+    osc.start(current);
+    osc.stop(current + duration);
+    current += duration * 1.05;
+  }
+
+  // let the audio finish naturally — don’t close context
+  console.log("🎶 Played:", scaleString);
 }
 
