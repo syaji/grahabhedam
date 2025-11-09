@@ -1,6 +1,21 @@
 // ✅ Guaranteed audible on iOS, Android, and desktop Safari
 let audioContext;
 
+// 🩺 iOS Safari fix: ensure speaker output and correct category
+if (typeof window.webkitAudioContext !== "undefined") {
+  try {
+    // Force AudioContext to use speaker instead of earpiece
+    window.AudioContext = window.webkitAudioContext;
+    const audioEl = document.createElement("audio");
+    audioEl.src = "data:audio/mp3;base64,";
+    audioEl.play().catch(() => {}); // harmless; helps iOS route audio to speaker
+    console.log("🔊 iOS AudioContext prepared for speaker playback");
+  } catch (e) {
+    console.warn("Speaker routing setup failed:", e);
+  }
+}
+
+
 export function getAudioContext() {
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -25,11 +40,7 @@ export function unlockAudio() {
 export function playRaga(scaleString) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   const ctx = new AudioContextClass(); // create inside user gesture
-
-  // Resume explicitly (required by iOS)
-  if (ctx.state === "suspended") {
-    ctx.resume();
-  }
+  if (ctx.state === "suspended") ctx.resume();
 
   const map = {
     S: 0,
@@ -53,12 +64,17 @@ export function playRaga(scaleString) {
     osc.connect(gain).connect(ctx.destination);
     osc.frequency.setValueAtTime(freq, time);
     osc.type = "sine";
-
     osc.start(time);
     osc.stop(time + dur);
   }
 
-  // Aarohana
+  // 🧭 Detect if it's a 7-note (Janaka) raga
+  const uniqueCount = new Set(notes).size;
+  const isJanaka = uniqueCount === 7;
+
+  // -------------------------------
+  // 🪜 Aarohana (Ascending)
+  // -------------------------------
   for (const s of notes) {
     const semi = map[s];
     if (semi === undefined) continue;
@@ -69,23 +85,40 @@ export function playRaga(scaleString) {
     t += dur * 1.05;
   }
 
-// Avarohana (repeat top S once, then descend back to lower S)
-const revNotes = [...notes].reverse();
-for (let i = 0; i < revNotes.length; i++) {
-  const s = revNotes[i];
-  const semi = map[s];
-  if (semi === undefined) continue;
+  // ➕ For Janaka: append explicit high Sa
+  if (isJanaka) {
+    const highSa = baseFreq * 2;
+    tone(highSa, t);
+    t += dur * 1.05;
+  }
 
-  // play high Sa only for the *first* S in descent
-  const isFirstInDescent = (i === 0 && s === "S");
-  const f = isFirstInDescent
-    ? baseFreq * 2
-    : baseFreq * Math.pow(2, semi / 12);
+  // -------------------------------
+  // 🪶 Avarohana (Descending)
+  // -------------------------------
+  const revNotes = [...notes].reverse();
 
-  tone(f, t);
-  t += dur * 1.05;
-}
+  // ➕ For Janaka: start again from high Sa before descending
+  if (isJanaka) {
+    const highSa = baseFreq * 2;
+    tone(highSa, t);
+    t += dur * 1.05;
+  }
 
+  for (let i = 0; i < revNotes.length; i++) {
+    const s = revNotes[i];
+    const semi = map[s];
+    if (semi === undefined) continue;
+
+    const isTopS = (i === 0 && s === "S");
+    const f = isTopS
+      ? baseFreq * 2
+      : baseFreq * Math.pow(2, semi / 12);
+
+    tone(f, t);
+    t += dur * 1.05;
+  }
+
+  console.log(`✅ Played: ${scaleString} (${isJanaka ? "Janaka" : "Janya"})`);
   // Don't close ctx; let iOS finish audio
   console.log("✅ Played:", scaleString);
 }
