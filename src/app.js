@@ -125,12 +125,14 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     }
   });
 
-  // Optional: skip SW for localhost
-  if (location.hostname !== "localhost" && "serviceWorker" in navigator) {
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./service-worker.js")
-      .then(() => console.log("✅ Service worker registered"))
-      .catch(err => console.error("Service worker failed:", err));
-  }
+      .then(reg => console.log("✅ Service Worker registered:", reg.scope))
+      .catch(err => console.error("❌ SW registration failed:", err));
+  });
+}
+
 });
 

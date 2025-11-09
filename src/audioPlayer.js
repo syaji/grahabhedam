@@ -47,16 +47,22 @@ export function playRaga(scaleString) {
     t += dur * 1.05;
   }
 
-  // Avarohana (repeat top S, then descend)
-  for (const s of [...notes].reverse()) {
-    const semi = map[s];
-    if (semi === undefined) continue;
-    const f = (s === "S" && t !== ctx.currentTime)
-      ? baseFreq * 2
-      : baseFreq * Math.pow(2, semi / 12);
-    tone(f, t);
-    t += dur * 1.05;
-  }
+// Avarohana (repeat top S once, then descend back to lower S)
+const revNotes = [...notes].reverse();
+for (let i = 0; i < revNotes.length; i++) {
+  const s = revNotes[i];
+  const semi = map[s];
+  if (semi === undefined) continue;
+
+  // play high Sa only for the *first* S in descent
+  const isFirstInDescent = (i === 0 && s === "S");
+  const f = isFirstInDescent
+    ? baseFreq * 2
+    : baseFreq * Math.pow(2, semi / 12);
+
+  tone(f, t);
+  t += dur * 1.05;
+}
 
   // Don't close ctx; let iOS finish audio
   console.log("✅ Played:", scaleString);
