@@ -151,8 +151,16 @@ if (name !== "Unknown" && store.reverseLookup && store.reverseLookup[name]) {
   finalNotes = store.reverseLookup[name];
 }
 
+// Determine which swara became the new 'S'
+const originalSwara = inputRow[shift]; // The note in the original pattern at this shift index
+
+// Append mapping "(S → X)" to the name
+const nameWithMapping = name === "Unknown"
+  ? name
+  : `${name} (S → ${originalSwara})`;
+
 results.push({
-  name,
+  name: nameWithMapping,
   notes: finalNotes
 });
 
