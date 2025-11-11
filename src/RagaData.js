@@ -86,6 +86,7 @@ export const RagaStore = {
   "S R3 G3 M2 P D2 N3": "Kosalam",
   "S R3 G3 M2 P D3 N3": "Rasikapriya",
 
+  "S G3 M2 D2 N3 S" : "Sunada Vinodhini"
   "S R2 G2 P D2 S" : "Shivaranjani",
   "S G2 M1 P N2 S" : "Suddha Dhanyasi",
   "S R2 M1 P N2 S" : "Madhyamavati",
