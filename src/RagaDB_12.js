@@ -27212,7 +27212,7 @@ export const RagaDB_12 = {
   },
   "Sivapriya": {
     "type": "janya",
-    "parent": "Bhavapriya",
+    "parent": "Kharaharapriya",
     "variations": {
       "Sivapriya1": {
         "arohanam": "S R1 G2 M2 D1 N2 S",
@@ -27222,11 +27222,11 @@ export const RagaDB_12 = {
   },
   "Siva Ranjani": {
     "type": "janya",
-    "parent": "Vachaspati",
+    "parent": "Kharaharapriya",
     "variations": {
       "Siva Ranjani1": {
-        "arohanam": "S R2 G3 M2 D2 P D2 N2 S",
-        "avarohanam": "S N2 D2 P D2 M2 G3 R2 S R2"
+        "arohanam": "S R2 G2 P D2 S",
+        "avarohanam": "S D2 P G2 R2 S"
       }
     }
   },
