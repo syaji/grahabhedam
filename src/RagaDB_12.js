@@ -37480,16 +37480,6 @@ export const RagaDB_12 = {
       }
     }
   },
-  "AmrithaVarshani": {
-    "type": "janya",
-    "parent": "Jhalavarali",
-    "variations": {
-      "AmrithaVarshani1": {
-        "arohanam": "S R1 G1 M2 P D1 N3 P S",
-        "avarohanam": "S N3 P D1 M2 G1 R1 S"
-      }
-    }
-  },
   "Anangadhari": {
     "type": "janya",
     "parent": "Jhalavarali",
@@ -48842,7 +48832,7 @@ export const RagaDB_12 = {
   },
   "Amrithavarshini": {
     "type": "janya",
-    "parent": "Rasikapriya",
+    "parent": "Chitrambari",
     "variations": {
       "Amrithavarshini1": {
         "arohanam": "S G3 M2 P N3 S",
