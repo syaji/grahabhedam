@@ -104,6 +104,41 @@ hr {
 }
 .fab-collapse[hidden] { display: none; }
 
+/* Android datalist fix */
+datalist {
+  max-height: 220px !important;
+  overflow-y: auto !important;
+}
+
+/* Prevent full-screen dropdown */
+#dropdown {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+/* Android keyboard fix */
+@supports (-webkit-touch-callout: none) {
+  body.android-fix {
+    min-height: 100% !important;
+    height: auto !important;
+    display: block !important;
+    overflow-y: auto !important;
+  }
+
+  .container {
+    max-height: calc(100vh - 120px) !important;
+    overflow-y: auto !important;
+  }
+
+  datalist, #dropdown {
+    max-height: 200px !important;
+    overflow-y: auto !important;
+  }
+
+  input {
+    font-size: 16px !important;
+  }
+}
 
 .jj-more-results { margin-top: 12px; }
 .jj-more-results summary { cursor: pointer; font-weight: 600; margin: 8px 0; }
