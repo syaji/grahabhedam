@@ -91,6 +91,75 @@ function resetUI() {
     if (el) el.innerHTML = "";
   }
 }
+/* -------------------- fuzzy search helpers -------------------- */
+
+// Canonical normalization for fuzzy comparison
+function normalizeName(str) {
+  return (str || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")     // remove spaces
+    .replace(/sh/g, "s")     // sh → s
+    .replace(/th/g, "t")     // th → t
+    .replace(/kh/g, "k")
+    .replace(/gh/g, "g")
+    .replace(/dh/g, "d")
+    .replace(/[āâáà]/g, "a")
+    .replace(/[īîíì]/g, "i")
+    .replace(/[ūûúù]/g, "u");
+}
+
+// Classic Levenshtein distance
+function lev(a, b) {
+  const dp = Array(a.length + 1).fill(null).map(() =>
+    Array(b.length + 1).fill(0)
+  );
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+
+// Option D ranking: exact normalized > prefix > contains > edit distance
+function fuzzyBestMatch(query) {
+  const q = normalizeName(query);
+  if (!q) return null;
+
+  let best = null;
+
+  // 1. exact normalized match
+  let exacts = FUZZY_INDEX.filter(r => r.norm === q);
+  if (exacts.length) return exacts[0].name;
+
+  // 2. prefix match
+  let prefs = FUZZY_INDEX.filter(r => r.norm.startsWith(q));
+  if (prefs.length) return prefs[0].name;
+
+  // 3. substring match
+  let subs = FUZZY_INDEX.filter(r => r.norm.includes(q));
+  if (subs.length) return subs[0].name;
+
+  // 4. Levenshtein distance ≤ 2
+  let bestDist = Infinity;
+  for (const r of FUZZY_INDEX) {
+    const d = lev(q, r.norm);
+    if (d < bestDist) {
+      bestDist = d;
+      best = r.name;
+    }
+  }
+  return bestDist <= 2 ? best : null;
+}
 
 /* -------------------- build store + indices -------------------- */
 /* IMPORTANT: exact-match index — NO alias substitutions.
@@ -163,6 +232,12 @@ function resetUI() {
   
   const RagaStore = buildStore(RagaDB);
   
+// Build a fuzzy index of canonical names
+const FUZZY_INDEX = RagaStore.names.map(name => ({
+  name,
+  norm: normalizeName(name)
+}));
+
 
 // after RagaDB_12 / RagaStore exists:
 const ExactAroAvaIndex = buildExactAroAvaIndex(RagaDB); // or RagaDB_12, whatever you import
@@ -479,14 +554,30 @@ function generateFromSelected() {
   if (!inputEl) return;
 
   const typed = inputEl.value.trim();
-  const canon = RagaStore.nameLut[typed.toLowerCase()] || typed;
+
+  // ---------- PATCHED: fuzzy-correct the name ----------
+  let canon = RagaStore.nameLut[typed.toLowerCase()];
+
+  // If exact match not found, apply fuzzy (your step 2 = YES)
+  if (!canon) {
+    const fuzzy = fuzzyBestMatch(typed);
+    if (fuzzy) {
+      canon = fuzzy;
+      inputEl.value = fuzzy;   // override typed value (your requirement)
+    }
+  }
+
+  // If still nothing, fallback to typed
+  if (!canon) canon = typed;
+  // ------------------------------------------------------
 
   const node = RagaStore.byName[canon];
   const resultsDiv = $("#results");
   if (resultsDiv) resultsDiv.innerHTML = "";
 
   if (!node) {
-    if (resultsDiv) resultsDiv.innerHTML = `<div class="muted">❌ Unknown raga: ${canon}</div>`;
+    if (resultsDiv)
+      resultsDiv.innerHTML = `<div class="muted">❌ Unknown raga: ${canon}</div>`;
     return;
   }
 
@@ -507,7 +598,8 @@ function generateFromSelected() {
   }
 
   if (!inputAro) {
-    if (resultsDiv) resultsDiv.innerHTML = `<div class="muted">❌ No Arohanam found for ${canon}</div>`;
+    if (resultsDiv)
+      resultsDiv.innerHTML = `<div class="muted">❌ No Arohanam found for ${canon}</div>`;
     return;
   }
 
@@ -530,8 +622,6 @@ function generateFromSelected() {
 
   renderGrahabhedams(rows);
 }
-
-
 
 /* -------------------- boot -------------------- */
 document.addEventListener("DOMContentLoaded", () => {
@@ -564,16 +654,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // show card as soon as the user selects an exact name (case-insensitive)
   if (input) {
-    const tryRender = () => {
+    
+    const updateSelection = () => {
       const typed = input.value.trim();
-      const canon = RagaStore.nameLut[typed.toLowerCase()];
-      resetUI(); // 🔄 clear remnants before showing a new selection
+      if (!typed) {
+        resetUI();
+        return;
+      }
+      // Exact name match only
+      let canon = RagaStore.nameLut[typed.toLowerCase()];
+      resetUI();
       if (canon) renderSelectedInfo(canon);
     };
-    input.addEventListener("change", tryRender);
-    input.addEventListener("input", tryRender);
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryRender(); });
+
+  
+    input.addEventListener("input", updateSelection);
+    input.addEventListener("change", updateSelection);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") updateSelection();
+    });
   }
+  
 
   if (btnGen) {
     btnGen.addEventListener("click", () => {
@@ -583,22 +684,37 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // “Find Janaka/Janya Ragams”: if janya is selected, jump to its parent; else show janyas of janaka
-  if (btnFind) {
-    btnFind.addEventListener("click", () => {
-      resetUI();          // 🔄 clear before rendering relations
-      const typed = input ? input.value.trim() : "";
-      if (!typed) return;
+// “Find Janaka/Janya Ragams”: if janya is selected, jump to its parent; else show janyas of janaka
+if (btnFind) {
+  btnFind.addEventListener("click", () => {
+    resetUI();          // 🔄 clear before rendering relations
+    const typed = input ? input.value.trim() : "";
+    if (!typed) return;
 
-      const canon = RagaStore.nameLut[typed.toLowerCase()] || typed;
-      const node  = RagaStore.byName[canon];
-      if (!node) return;
+    // ---------- PATCHED: fuzzy-correct the name ----------
+    let canon = RagaStore.nameLut[typed.toLowerCase()];
 
-      const janaka = node.type === "janya" ? (node.parent || "") : canon;
-      if (!janaka) return;
+    if (!canon) {
+      const fuzzy = fuzzyBestMatch(typed);
+      if (fuzzy) {
+        canon = fuzzy;
+        if (input) input.value = fuzzy;   // override user text (your requirement)
+      }
+    }
 
-      renderJanyasForJanaka(janaka);
-    });
-  }
+    if (!canon) canon = typed;
+    // ------------------------------------------------------
+
+    const node = RagaStore.byName[canon];
+    if (!node) return;
+
+    const janaka = node.type === "janya" ? (node.parent || "") : canon;
+    if (!janaka) return;
+
+    renderJanyasForJanaka(janaka);
+  });
+}
+
 });
 
 
