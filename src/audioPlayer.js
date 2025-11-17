@@ -97,20 +97,12 @@ export function playRaga(scaleString) {
       }
     });
 
-    if (isJanaka) {
-      schedule(baseFreq * 2, t);
-      t += noteDur * 1.05;
-    }
 
     // -------------------------
     // Descending
     // -------------------------
     const rev = [...notes].reverse();
 
-    if (isJanaka) {
-      schedule(baseFreq * 2, t);
-      t += noteDur * 1.05;
-    }
 
     rev.forEach((s, idx) => {
       const isTopSa = (idx === 0 && s === "S");
