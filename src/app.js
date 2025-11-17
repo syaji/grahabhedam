@@ -1,138 +1,615 @@
-import { playRaga } from './audioPlayer.js';
-import { RagaStore } from "./RagaData.js";
-import { GrahabhedamEngine } from "./GrahabhedamEngine.js";
-import { playRaga, unlockAudioForiOS } from './audioPlayer.js';
+// app.js — works with ids: ragaSearch, ragaSuggestions, generateBtn, findRelationsBtn, results, selectedInfo
 
+import RagaDB from "./RagaDB_12.js";
+import GEngine from "./GrahabhedamEngine.js";
+import { playRaga, unlockAudio } from "./audioPlayer.js";
 
-// 🎵 iOS Safari audio unlock — play silent buffer on first tap
-if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-  document.addEventListener("touchstart", unlockAudioForiOS, { once: true });
+/* -------------------- tiny helpers -------------------- */
+const $ = (sel) => document.querySelector(sel);
+const norm = (s) => (s || "").trim().replace(/\s+/g, " ");
+
+// Make a valid avarohanam from an arohanam string.
+// Guarantees: begins with "S" and ends with "S".
+function reverseAro(aro) {
+  const toks = (aro || "").trim().split(/\s+/).filter(Boolean);
+  if (toks.length === 0) return "S";
+
+  if (toks[0] !== "S") toks.unshift("S");
+  if (toks[toks.length - 1] !== "S") toks.push("S");
+
+  const rev = toks.slice().reverse();
+
+  if (rev[0] !== "S") rev.unshift("S");
+  while (rev.length > 1 && rev[0] === "S" && rev[1] === "S") rev.splice(0, 1);
+
+  if (rev[rev.length - 1] !== "S") rev.push("S");
+  return rev.join(" ");
 }
 
-  const searchInput = document.getElementById("ragaSearch");
-  const dropdown = document.getElementById("dropdown");
-  const selectedInfo = document.getElementById("selectedInfo");
-  const generateBtn = document.getElementById("generateBtn");
-  const resultsContainer = document.getElementById("results");
+// Ensure an arohanam is bounded by S on both ends.
+function ensureAroEndsWithS(aro) {
+  const toks = (aro || "").trim().split(/\s+/).filter(Boolean);
+  if (toks.length === 0) return "S";
+  if (toks[0] !== "S") toks.unshift("S");
+  if (toks[toks.length - 1] !== "S") toks.push("S");
+  return toks.join(" ");
+}
 
-  let selectedRaga = null;
+// Prefer melakarta when multiple names share the same aro/ava
+function pickBestName(candidates, store) {
+  if (!candidates || candidates.length === 0) return null;
+  const mela = candidates.find(n => store.byName[n]?.type === "melakarta");
+  if (mela) return mela;
+  return candidates.slice().sort((a,b) => a.localeCompare(b))[0];
+}
 
-  // Convert raga lookup map to array
-  const allRagas = Object.entries(RagaStore.canonicalRagaLookup).map(([notes, name]) => ({
-    name,
-    notes
-  }));
+// Build exact (aro, ava) -> raga name map without any normalization.
+// We include melakarta and all janya variations exactly as stored in RagaDB_12.
+function buildExactAroAvaIndex(rdb) {
+  const idx = new Map();
 
-  // Handle search input
-  searchInput.addEventListener("input", () => {
-    const query = searchInput.value.trim().toLowerCase();
-    dropdown.innerHTML = "";
+  // helper to store if both strings exist
+  const putIfValid = (name, aro, ava) => {
+    if (!aro || !ava) return;
+    const key = `${aro.trim()}||${ava.trim()}`;
+    if (!idx.has(key)) idx.set(key, name);
+  };
 
-    if (!query) {
-      dropdown.style.display = "none";
-      return;
+  for (const [name, data] of Object.entries(rdb)) {
+    if (data.type === "melakarta") {
+      // use exactly what's in the DB (you already fixed ends-with-S elsewhere)
+      putIfValid(name, data.arohanam, data.avarohanam);
+
+      // some melakarta also carry janyas; we do NOT index those here
+      // because the actual janya definitions live in the global object
+      // (i.e., at top-level keys) — which we index below.
+    } else if (data.type === "janya" && data.variations) {
+      for (const [variantName, v] of Object.entries(data.variations)) {
+        putIfValid(name, v.arohanam, v.avarohanam);
+      }
     }
+  }
+  return idx;
+}
 
-    const matches = allRagas.filter(r =>
-      r.name.toLowerCase().includes(query) || r.notes.toLowerCase().includes(query)
-    );
+function lookupByExactAroAva(aro, ava) {
+  const key = `${aro.trim()}||${ava.trim()}`;
+  return ExactAroAvaIndex.get(key) || "Unknown";
+}
 
-    if (matches.length === 0) {
-      dropdown.style.display = "none";
-      return;
-    }
-
-    matches.forEach(r => {
-      const item = document.createElement("div");
-      item.className = "dropdown-item";
-      item.textContent = `${r.name} — ${r.notes}`;
-      item.addEventListener("click", () => {
-        selectedRaga = r;
-        searchInput.value = r.name;
-        dropdown.style.display = "none";
-
-        // Clear and show selected raga info
-        selectedInfo.innerHTML = "";
-
-        const infoDiv = document.createElement("div");
-        infoDiv.innerHTML = `<strong>${r.name}</strong><br>${r.notes}`;
-        infoDiv.style.marginTop = "10px";
-
-        // 🎵 Play button for input raga
-        const playBtn = document.createElement("button");
-        playBtn.textContent = "▶️";
-        playBtn.className = "play-btn";
-        playBtn.style.marginLeft = "10px";
-        playBtn.onclick = () => playRaga(r.notes);
-
-        infoDiv.appendChild(playBtn);
-        selectedInfo.appendChild(infoDiv);
-
-        generateBtn.disabled = false;
-      });
-
-      dropdown.appendChild(item);
-    });
-
-    dropdown.style.display = "block";
-  });
-
-  searchInput.addEventListener("blur", () =>
-    setTimeout(() => (dropdown.style.display = "none"), 150)
+const hasAllFamilies = (aroStr) => {
+  const fams = new Set(
+    aroStr.trim().split(/\s+/).map(n => n[0])
   );
+  return ["S","R","G","M","P","D","N"].every(f => fams.has(f));
+};
 
-  // Handle Grahabhedam generation
-  generateBtn.addEventListener("click", () => {
-    if (!selectedRaga) return;
-
-    const results = GrahabhedamEngine.generate(selectedRaga.notes, RagaStore);
-    resultsContainer.innerHTML = "";
-
-    results.forEach(r => {
-      const card = document.createElement("div");
-      card.className = "result-card";
-
-      const name = document.createElement("div");
-      name.innerHTML = `<strong>${r.name}</strong><br>${r.notes}`;
-
-      // 🎵 Play button for result raga
-      const playBtn = document.createElement("button");
-      playBtn.textContent = "▶️";
-      playBtn.className = "play-btn";
-      playBtn.onclick = () => playRaga(r.notes);
-
-      card.appendChild(name);
-      card.appendChild(playBtn);
-      resultsContainer.appendChild(card);
-    });
-
-    // Play All button
-    if (results.length > 0) {
-      const playAll = document.createElement("button");
-      playAll.textContent = "🎧 Play All Grahabhedams";
-      playAll.className = "play-btn";
-      playAll.style.display = "block";
-      playAll.style.margin = "12px auto";
-      playAll.onclick = async () => {
-        for (const r of results) {
-          await new Promise(resolve => {
-            playRaga(r.notes);
-            setTimeout(resolve, 3500);
-          });
-        }
-      };
-      resultsContainer.appendChild(playAll);
-    }
-  });
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("./service-worker.js")
-      .then(reg => console.log("✅ Service Worker registered:", reg.scope))
-      .catch(err => console.error("❌ SW registration failed:", err));
-  });
+function resetUI() {
+  const ids = ["selectedInfo", "results", "janakaRaga", "janyaRagas", "dropdown"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = "";
+  }
 }
 
+/* -------------------- build store + indices -------------------- */
+/* IMPORTANT: exact-match index — NO alias substitutions.
+   Keys are `${ARO}|${AVA}` using the raw DB strings (only trimmed and S-bounded). */
+   function buildStore(rdb) {
+    const store = {
+      byName: {},                    // canonical name -> node
+      names: [],                     // sorted canonical names (for <datalist>)
+      nameLut: {},                   // lowercase name -> canonical name
+      janakaToJanya: {},             // melakarta -> [janya names]
+      janyaToJanaka: {},             // janya -> parent  (FIRST melakarta wins)
+      byAroAva: Object.create(null), // "ARO|AVA" -> [candidate names] (exact)
+    };
+  
+    // ----- Melakartas (first pass) -----
+    for (const [name, data] of Object.entries(rdb)) {
+      if (data.type !== "melakarta") continue;
+  
+      store.byName[name] = data;
+  
+      const aro = ensureAroEndsWithS(norm(data.arohanam));
+      const ava = norm(
+        data.avarohanam && data.avarohanam.trim()
+          ? data.avarohanam
+          : reverseAro(aro)
+      );
+      const key = `${aro}|${ava}`;
+      (store.byAroAva[key] ||= []).push(name);
+  
+      const janyas = Object.keys(data.janyas || {});
+      store.janakaToJanya[name] = janyas;
+  
+      // FIRST melakarta wins: only set if not set yet
+      for (const janyaName of janyas) {
+        if (!store.janyaToJanaka[janyaName]) {
+          store.janyaToJanaka[janyaName] = name;
+        }
+      }
+    }
+  
+    // ----- Janyas (+ variations) (second pass) -----
+    for (const [name, data] of Object.entries(rdb)) {
+      if (data.type !== "janya") continue;
+  
+      store.byName[name] = data;
+  
+      // Do NOT overwrite if a melakarta already claimed this janya
+      if (data.parent && !store.janyaToJanaka[name]) {
+        store.janyaToJanaka[name] = data.parent;
+      }
+  
+      const vars = data.variations || {};
+      for (const v of Object.values(vars)) {
+        const aro = ensureAroEndsWithS(norm(v.arohanam));
+        const ava = norm(
+          v.avarohanam && v.avarohanam.trim()
+            ? v.avarohanam
+            : reverseAro(aro)
+        );
+        const key = `${aro}|${ava}`;
+        (store.byAroAva[key] ||= []).push(name);
+      }
+    }
+  
+    store.names = Object.keys(store.byName).sort((a, b) => a.localeCompare(b));
+    for (const n of store.names) store.nameLut[n.toLowerCase()] = n;
+  
+    return store;
+  }
+  
+  const RagaStore = buildStore(RagaDB);
+  
+
+// after RagaDB_12 / RagaStore exists:
+const ExactAroAvaIndex = buildExactAroAvaIndex(RagaDB); // or RagaDB_12, whatever you import
+
+/* -------------------- renderers -------------------- */
+function renderSelectedInfo(name) {
+  const box = $("#selectedInfo");
+  if (!box) return;
+
+  const canon = RagaStore.nameLut[name.toLowerCase()] || name;
+  const node = RagaStore.byName[canon];
+  if (!node) {
+    box.innerHTML = `<div class="muted">❌ No matching raga found. Try a different spelling.</div>`;
+    return;
+  }
+
+  let title = canon;
+  let aroForPlay = "";
+  const lines = [];
+
+  if (node.type === "janya") {
+    title += " (Janya)";
+    if (node.parent) lines.push(`<div><b>Parent:</b> ${node.parent}</div>`);
+    const firstVar = Object.values(node.variations || {})[0];
+    if (firstVar) {
+      const aro = ensureAroEndsWithS(norm(firstVar.arohanam));
+      const ava = norm(firstVar.avarohanam && firstVar.avarohanam.trim() ? firstVar.avarohanam : reverseAro(aro));
+      aroForPlay = aro;
+      lines.push(`<div><b>Arohanam:</b> ${aro}</div>`);
+      lines.push(`<div><b>Avarohanam:</b> ${ava}</div>`);
+    }
+  } else {
+    title += " (Janaka)";
+    const notes = norm(node.notes || "");
+    const aro = ensureAroEndsWithS(norm(node.arohanam));
+    const ava = norm(node.avarohanam && node.avarohanam.trim() ? node.avarohanam : reverseAro(aro));
+    aroForPlay = aro;
+    if (notes) lines.push(`<div><b>Notes:</b> ${notes}</div>`);
+    lines.push(`<div><b>Arohanam:</b> ${aro}</div>`);
+    lines.push(`<div><b>Avarohanam:</b> ${ava}</div>`);
+  }
+
+  box.innerHTML = `
+    <div class="card">
+      <div class="card-title">${title}</div>
+      <div class="card-body">${lines.join("")}</div>
+      <button id="playSelected" class="playBtn">▶ Play</button>
+    </div>
+  `;
+
+  const btn = $("#playSelected");
+  if (btn && aroForPlay) btn.onclick = () => playRaga(aroForPlay);
+}
+
+function grahaResultCard(data) {
+  const name = data.name || data.title || "Unknown";
+  const aro  = data.aro || data.arohanam || data.notes || "—";
+  const ava  = data.ava || data.avarohanam || "—";
+
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `
+    <div class="card-title">${name}</div>
+    <div class="card-body">
+      <div><b>Arohanam:</b> ${aro}</div>
+      <div><b>Avarohanam:</b> ${ava}</div>
+    </div>
+    <button class="playBtn">▶ Play</button>
+  `;
+  el.querySelector(".playBtn").onclick = () => playRaga(aro);
+  return el;
+}
+
+
+function renderGrahabhedams(all) {
+  const results = $("#results");
+  if (!results) return;
+  results.innerHTML = "";
+
+  if (!all || all.length === 0) {
+    results.innerHTML = `<div class="muted">❌ No valid Grahabhedam results.</div>`;
+    return;
+  }
+
+  // helper: pull "R2" from "Name (S → R2)"
+  const extractShift = (name) => {
+    const m = /\(S\s*→\s*([^)]+)\)/.exec(name || "");
+    return m ? m[1].trim() : null;
+  };
+
+  // NEW: only melakarta-like scales (all seven families) get a trailing S when missing
+  const hasAllFamilies = (aroStr) => {
+    const fams = new Set(aroStr.trim().split(/\s+/).map(n => n[0]));
+    return ["S","R","G","M","P","D","N"].every(f => fams.has(f));
+  };
+
+  // Build display rows with exact aro/ava and clean label
+  const enhanced = all.map((res) => {
+    // 1) Arohanam exactly as engine produced it (normalized spaces)
+    const aroRaw = (res.notes || "").trim().replace(/\s+/g, " ");
+
+    // If the aro has ALL seven families (melakarta-like) and doesn't end with S, append S.
+    let aro = aroRaw;
+    if (hasAllFamilies(aroRaw)) {
+      const toks = aroRaw.split(" ").filter(Boolean);
+      if (toks[toks.length - 1] !== "S") {
+        toks.push("S");
+        aro = toks.join(" ");
+      }
+    }
+
+    // 2) Avarohanam = reverse inside, keep S … S bookends
+    const parts = aro.split(" ").filter(Boolean);
+    let ava;
+    if (parts.length >= 2 && parts[0] === "S" && parts[parts.length - 1] === "S") {
+      const middle = parts.slice(1, -1).reverse();
+      ava = ["S", ...middle, "S"].join(" ");
+    } else {
+      const rev = [...parts].reverse();
+      if (rev[0] !== "S") rev.unshift("S");
+      if (rev[rev.length - 1] !== "S") rev.push("S");
+      ava = rev.join(" ");
+    }
+
+    // 3) Exact DB lookup (no alias swaps)
+    const exactName = (typeof lookupByExactAroAva === "function")
+      ? (lookupByExactAroAva(aro, ava) || "Unknown")
+      : (res.name || "Unknown");
+
+    // 4) Clean mapping label: remove leading "S → " if present
+    const shiftRaw = res.shiftLabel
+      ? res.shiftLabel.replace(/^S\s*→\s*/,'').trim()
+      : (extractShift(res.name) || "");
+
+    const displayName =
+      (exactName && exactName !== "Unknown")
+        ? (shiftRaw ? `${exactName} (S → ${shiftRaw})` : exactName)
+        : (res.name || "Unknown");
+
+    return {
+      ...res,
+      name: displayName,
+      aro,
+      ava,
+      arohanam: aro,
+      avarohanam: ava
+    };
+  });
+
+  const firstTwo = enhanced.slice(0, 2);
+  const rest = enhanced.slice(2);
+
+  for (const r of firstTwo) results.appendChild(grahaResultCard(r));
+
+  if (rest.length > 0) {
+    const moreWrap = document.createElement("div");
+    moreWrap.style.display = "none";
+    for (const r of rest) moreWrap.appendChild(grahaResultCard(r));
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.style.marginTop = "8px";
+    toggle.textContent = `▾ Show ${rest.length} more`;
+
+    toggle.addEventListener("click", () => {
+      const isOpen = moreWrap.style.display !== "none";
+      moreWrap.style.display = isOpen ? "none" : "block";
+      toggle.textContent = isOpen ? `▾ Show ${rest.length} more` : "▴ Show less";
+      toggle.setAttribute("aria-expanded", String(!isOpen));
+    });
+
+    results.appendChild(toggle);
+    results.appendChild(moreWrap);
+  }
+}
+
+
+
+
+function renderJanyasForJanaka(janakaName) {
+  const resultsRoot = document.getElementById("results");
+  if (!resultsRoot) return;
+
+  resultsRoot.innerHTML = "";
+
+  const node = RagaStore.byName[janakaName];
+  if (!node || node.type !== "melakarta") {
+    resultsRoot.innerHTML = `
+      <div class="card">
+        <div class="card-title">Janaka not found</div>
+        <div class="card-body">“${janakaName}” is not a melakarta in the database.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const janyaNames = RagaStore.janakaToJanya[janakaName] || [];
+
+  // Build two-cards-first + toggle UI, with play buttons and clean wrapping
+  const list = document.createElement("div");
+  const shown = 2;
+
+  const makeJanyaCard = (name) => {
+    const jNode = RagaStore.byName[name];
+    const v = Object.values(jNode?.variations || {})[0] || {};
+    const aro = ensureAroEndsWithS(norm(v.arohanam || jNode?.arohanam || ""));
+    const ava = norm(v.avarohanam && v.avarohanam.trim() ? v.avarohanam : reverseAro(aro));
+
+    const card = document.createElement("div");
+    card.className = "card janya-card";
+
+    const title = document.createElement("div");
+    title.className = "card-title janya-title";
+    const nameEl = document.createElement("div");
+    nameEl.className = "janya-name";
+    nameEl.textContent = name;
+    title.appendChild(nameEl);
+    card.appendChild(title);
+
+    const body = document.createElement("div");
+    body.className = "card-body";
+    body.innerHTML = `
+      <div><strong>Arohanam:</strong> ${aro || "—"}</div>
+      <div><strong>Avarohanam:</strong> ${ava || "—"}</div>
+    `;
+
+    const playWrap = document.createElement("div");
+    playWrap.className = "play-wrap";
+    const btn = document.createElement("button");
+    btn.className = "btn btn-primary";
+    btn.textContent = "▶ Play";
+    btn.addEventListener("click", () => playRaga(aro));
+    playWrap.appendChild(btn);
+
+    body.appendChild(playWrap);
+    card.appendChild(body);
+    return card;
+  };
+
+  const addRange = (arr) => {
+    for (const n of arr) {
+      if (!RagaStore.byName[n]) continue;
+      list.appendChild(makeJanyaCard(n));
+    }
+  };
+
+  addRange(janyaNames.slice(0, shown));
+  resultsRoot.appendChild(list);
+
+  if (janyaNames.length > shown) {
+    // Hidden container for the rest
+    const restWrap = document.createElement("div");
+    restWrap.id = "janya-more";
+    restWrap.style.display = "none";
+    resultsRoot.appendChild(restWrap);
+
+    // Top toggle button
+    const toggle = document.createElement("button");
+    toggle.className = "btn btn-link show-more";
+    toggle.textContent = `▾ Show ${janyaNames.length - shown} more`;
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", "janya-more");
+    let expanded = false;
+
+    // ★ Floating collapse button (one per page; reuse if it already exists)
+    let fab = document.getElementById("janyaCollapseFab");
+    if (!fab) {
+      fab = document.createElement("button");
+      fab.id = "janyaCollapseFab";
+      fab.className = "fab-collapse";
+      fab.textContent = "▴ Collapse";
+      fab.hidden = true; // hidden until expanded
+      document.body.appendChild(fab);
+    }
+
+    const setExpanded = (wantExpanded) => {
+      expanded = !!wantExpanded;
+      if (expanded) {
+        // fill and show
+        restWrap.replaceChildren();
+        addRange(janyaNames.slice(shown));
+        restWrap.style.display = "block";
+        toggle.textContent = "▴ Show less";
+        toggle.setAttribute("aria-expanded", "true");
+        fab.hidden = false; // show FAB
+      } else {
+        // collapse to first two
+        restWrap.style.display = "none";
+        restWrap.replaceChildren();
+        list.replaceChildren();
+        addRange(janyaNames.slice(0, shown));
+        toggle.textContent = `▾ Show ${janyaNames.length - shown} more`;
+        toggle.setAttribute("aria-expanded", "false");
+        fab.hidden = true; // hide FAB
+        // optional: snap back near the top of the section
+        resultsRoot.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    };
+
+    toggle.addEventListener("click", () => setExpanded(!expanded));
+    fab.addEventListener("click", () => setExpanded(false)); // collapse from anywhere
+
+    resultsRoot.appendChild(toggle);
+    resultsRoot.appendChild(restWrap);
+  }
+}
+
+
+/* -------------------- grahabhedam action -------------------- */
+// --- PATCH: parent-guided Grahabhedam generation ---
+function generateFromSelected() {
+  const inputEl = $("#ragaSearch");
+  if (!inputEl) return;
+
+  const typed = inputEl.value.trim();
+  const canon = RagaStore.nameLut[typed.toLowerCase()] || typed;
+
+  const node = RagaStore.byName[canon];
+  const resultsDiv = $("#results");
+  if (resultsDiv) resultsDiv.innerHTML = "";
+
+  if (!node) {
+    if (resultsDiv) resultsDiv.innerHTML = `<div class="muted">❌ Unknown raga: ${canon}</div>`;
+    return;
+  }
+
+  // --- Determine the input Arohanam string for the engine ---
+  let inputAro = "";
+  if (node.type === "melakarta") {
+    inputAro = ensureAroEndsWithS(norm(node.arohanam || ""));
+  } else if (node.type === "janya") {
+    // Prefer the first variation's arohanam
+    const vars = node.variations || {};
+    const firstKey = Object.keys(vars)[0];
+    if (firstKey && vars[firstKey]?.arohanam) {
+      inputAro = ensureAroEndsWithS(norm(vars[firstKey].arohanam));
+    } else {
+      // fallback if arohanam is directly on the node
+      inputAro = ensureAroEndsWithS(norm(node.arohanam || ""));
+    }
+  }
+
+  if (!inputAro) {
+    if (resultsDiv) resultsDiv.innerHTML = `<div class="muted">❌ No Arohanam found for ${canon}</div>`;
+    return;
+  }
+
+  // --- Provide parentNotes for ambiguity resolution (first-wins parent) ---
+  let parentNotes = "";
+  if (node.type === "janya") {
+    const parentName = RagaStore.janyaToJanaka[canon] || node.parent;
+    if (parentName && RagaStore.byName[parentName]) {
+      parentNotes = RagaStore.byName[parentName].notes || "";
+    }
+  } else if (node.type === "melakarta") {
+    parentNotes = node.notes || "";
+  }
+
+  // --- Generate and render ---
+  const rows = GEngine.generate(inputAro, {
+    requireSevenFamilies: false,
+    parentNotes
+  });
+
+  renderGrahabhedams(rows);
+}
+
+
+
+/* -------------------- boot -------------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  // unlock audio on first gesture
+  document.body.addEventListener("pointerdown", () => unlockAudio(), { once: true });
+
+  // 💡 small helper to clear previous output
+  function resetUI() {
+    const ids = ["selectedInfo", "results", "janakaRaga", "janyaRagas", "dropdown"];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = "";
+    }
+  }
+
+  const input    = $("#ragaSearch");
+  const datalist = $("#ragaSuggestions");
+  const btnGen   = $("#generateBtn");
+  const btnFind  = $("#findRelationsBtn");
+
+  // populate <datalist>
+  if (datalist) {
+    datalist.innerHTML = "";
+    for (const n of RagaStore.names) {
+      const opt = document.createElement("option");
+      opt.value = n;
+      datalist.appendChild(opt);
+    }
+  }
+
+  // show card as soon as the user selects an exact name (case-insensitive)
+  if (input) {
+    const tryRender = () => {
+      const typed = input.value.trim();
+      const canon = RagaStore.nameLut[typed.toLowerCase()];
+      resetUI(); // 🔄 clear remnants before showing a new selection
+      if (canon) renderSelectedInfo(canon);
+    };
+    input.addEventListener("change", tryRender);
+    input.addEventListener("input", tryRender);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") tryRender(); });
+  }
+
+  if (btnGen) {
+    btnGen.addEventListener("click", () => {
+      resetUI();          // 🔄 clear before generating fresh results
+      generateFromSelected();
+    });
+  }
+
+  // “Find Janaka/Janya Ragams”: if janya is selected, jump to its parent; else show janyas of janaka
+  if (btnFind) {
+    btnFind.addEventListener("click", () => {
+      resetUI();          // 🔄 clear before rendering relations
+      const typed = input ? input.value.trim() : "";
+      if (!typed) return;
+
+      const canon = RagaStore.nameLut[typed.toLowerCase()] || typed;
+      const node  = RagaStore.byName[canon];
+      if (!node) return;
+
+      const janaka = node.type === "janya" ? (node.parent || "") : canon;
+      if (!janaka) return;
+
+      renderJanyasForJanaka(janaka);
+    });
+  }
 });
+
+
+
+
+
+
+
+
+
+
+
+
 

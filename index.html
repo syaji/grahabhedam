@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Grahabhedam Generator</title>
+  <title>Raga Explorer</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
   <link rel="stylesheet" href="./style.css">
@@ -21,11 +21,23 @@
       padding: 20px;
     }
 
-    h1 {
-      font-size: 2em;
-      font-weight: 700;
-      margin-bottom: 10px;
+    /* ---- New Improved Title Styling ---- */
+    .app-title {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: white;
       text-align: center;
+      margin-bottom: 2px;
+      letter-spacing: 0.4px;
+    }
+
+    .app-subtitle {
+      text-align: center;
+      color: rgba(255,255,255,0.85);
+      margin-top: 0;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+      letter-spacing: 0.03em;
     }
 
     .container {
@@ -48,6 +60,14 @@
       text-align: center;
     }
 
+    /* Fix search box width / alignment */
+    input {
+      box-sizing: border-box;   /* ensures padding doesn't overflow */
+      width: 100% !important;   /* full width of the container */
+      display: block;           /* prevents inline weirdness */
+    }
+
+
     button {
       width: 100%;
       padding: 14px;
@@ -66,6 +86,60 @@
       transform: translateY(-1px);
     }
 
+    /* ---------- Dropdown Styles ---------- */
+
+    #dropdown {
+      /* ensure no styles conflict with our dynamic list */
+      margin-bottom: 10px;
+    }
+
+    .dropdown-list {
+      position: relative;
+      background: rgba(255, 255, 255, 0.98);
+      color: #003a80;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.15);
+      margin-top: 4px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      overflow: hidden;
+      animation: fadeIn 0.12s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .dropdown-header {
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: #f0f4ff;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+      color: #003a80;
+    }
+
+    .dropdown-item {
+      padding: 8px 12px;
+      font-size: 0.95rem;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+      cursor: pointer;
+      transition: background 0.15s ease;
+      color: #003a80;
+    }
+
+    .dropdown-item:last-child {
+      border-bottom: none;
+    }
+
+    .dropdown-item:hover {
+      background: #e3efff;
+    }
+
+    /* ---------- Results ---------- */
+
     .results {
       margin-top: 20px;
     }
@@ -74,133 +148,107 @@
       background: rgba(255,255,255,0.9);
       color: #003a80;
       border-radius: 10px;
-      padding: 12px 16px;
-      margin-bottom: 10px;
+      padding: 16px 16px 14px;
+      margin-bottom: 14px;
       box-shadow: 0 3px 8px rgba(0,0,0,0.15);
     }
 
-    .card h3 {
-      margin: 0;
-      font-size: 1.1em;
+    /* ---------- Janaka/Janya Polished Styles ---------- */
+
+    .jj-card-title {
+      font-size: 1.05rem;
       font-weight: 700;
+      margin-bottom: 6px;
     }
 
-    .card p {
-      margin: 4px 0 0;
-      font-size: 1em;
-      font-weight: 500;
+    .jj-section-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      opacity: 0.7;
+      margin-top: 10px;
+      margin-bottom: 3px;
+      letter-spacing: 0.03em;
+    }
+
+    .jj-scale-box {
+      background: rgba(255,255,255,0.85);
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      color: #003a80;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+
+    .jj-scale-box p {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.3rem;
+    }
+
+    .jj-buttons {
+      display: flex;
+      justify-content: space-evenly;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .jj-btn {
+      padding: 9px 16px;
+      font-size: 0.9rem;
+      background: #005cdc;
+      color: white;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      min-width: 110px;
+      text-align: center;
+    }
+
+    .jj-btn:hover {
+      background: #004ab3;
     }
 
   </style>
 </head>
+
 <body>
-  <h1>Grahabhedam</h1>
+
+  <!-- New Title -->
+  <h1 class="app-title">Raga Explorer</h1>
+  <p class="app-subtitle">Grahabhedam • Janaka/Janya • Audio Explorer</p>
+
   <div class="container">
-    <input id="ragaSearch" placeholder="Search ragas (e.g., Ratnangi, Mohanam)...">
-    <div id="dropdown" class="dropdown"></div>
+
+<!-- Search Box -->
+<input
+  id="ragaSearch"
+  form="none"
+  inputmode="none"
+  type="text"
+  placeholder="Search ragas (e.g., Ratnangi, Mohanam)…"
+  autocomplete="off"
+  autocorrect="off"
+  autocapitalize="off"
+  spellcheck="false"
+  list="ragaSuggestions"
+/>
+<datalist id="ragaSuggestions"></datalist>
+
+
+    <!-- Dropdown Container (empty until JS fills it) -->
+    <div id="dropdown"></div>
+
     <div id="selectedInfo"></div>
+
+    <!-- Buttons -->
     <button id="generateBtn">Generate Grahabhedams</button>
+    <button id="findRelationsBtn" style="margin-top:10px;">Find Janaka/Janya Ragams</button>
+
     <div class="results" id="results"></div>
+
   </div>
 
-<script type="module">
-  import { RagaStore } from './src/RagaData.js';
-  import { GrahabhedamEngine } from './src/GrahabhedamEngine.js';
-  import { playRaga, unlockAudio } from './src/audioPlayer.js';
-
-
-document.body.addEventListener("touchstart", unlockAudio, { once: true });
-
-
-  window.addEventListener('DOMContentLoaded', () => {
-    const input = document.getElementById('ragaSearch');
-    const button = document.getElementById('generateBtn');
-    const output = document.getElementById('results');
-
-    // 🔹 Create scale display area
-    const scaleDisplay = document.createElement('div');
-    scaleDisplay.style.margin = "10px 0";
-    scaleDisplay.style.fontSize = "1.1em";
-    scaleDisplay.style.fontWeight = "600";
-    scaleDisplay.style.textAlign = "center";
-    scaleDisplay.style.color = "#fff";
-    scaleDisplay.style.textShadow = "0 1px 3px rgba(0,0,0,0.3)";
-    input.insertAdjacentElement('afterend', scaleDisplay);
-
-    // Build list of all raga names
-    const allRagas = Object.values(RagaStore.canonicalRagaLookup);
-
-    // Datalist for autocomplete
-    const dataList = document.createElement('datalist');
-    dataList.id = 'ragaList';
-    allRagas.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      dataList.appendChild(opt);
-    });
-    document.body.appendChild(dataList);
-    input.setAttribute('list', 'ragaList');
-
-    // 🔹 Show raga scale when user types or selects
-    input.addEventListener('input', () => {
-      const userValue = input.value.trim().toLowerCase();
-      const match = Object.entries(RagaStore.canonicalRagaLookup)
-        .find(([pattern, name]) => name.toLowerCase() === userValue);
-      scaleDisplay.innerHTML = match
-        ? `${match[0]} <button class="play-btn" id="inputPlayBtn">▶️</button>`
-        : "";
-      
-      // 🎵 attach play event
-      const playBtn = document.getElementById('inputPlayBtn');
-      if (playBtn && match) {
-        playBtn.addEventListener('click', () => playRaga(match[0]));
-      }
-    });
-
-    // 🔹 Generate Grahabhedams
-    button.addEventListener('click', () => {
-      const userValue = input.value.trim();
-      const match = Object.entries(RagaStore.canonicalRagaLookup)
-        .find(([pattern, name]) => name.toLowerCase() === userValue.toLowerCase());
-
-      if (!match) {
-        output.innerHTML = `<div class="card"><h3>❌ Unknown raga</h3><p>Please select from suggestions.</p></div>`;
-        scaleDisplay.textContent = "";
-        return;
-      }
-
-      const [pattern] = match;
-      const results = GrahabhedamEngine.generate(pattern, RagaStore);
-
-      output.innerHTML = results.map((r, i) => `
-        <div class="card">
-          <h3>${r.name}</h3>
-          <p>${r.notes}</p>
-          <button class="play-btn" id="playBtn${i}">▶️</button>
-        </div>
-      `).join('');
-
-      // attach handlers for all play buttons
-      results.forEach((r, i) => {
-        const btn = document.getElementById(`playBtn${i}`);
-        if (btn) btn.addEventListener('click', () => playRaga(r.notes));
-      });
-    });
-  });
-</script>
-
-
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker
-        .register("./service-worker.js")
-        .then(reg => console.log("✅ Service Worker registered:", reg.scope))
-        .catch(err => console.error("❌ SW registration failed:", err));
-    });
-  }
-</script>
-
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
 

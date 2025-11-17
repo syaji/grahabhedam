@@ -81,3 +81,32 @@ hr {
   background: #0d47a1;
 }
 
+/* Make long janya names wrap nicely */
+.janya-title { display: flex; align-items: center; }
+.janya-name { overflow-wrap: anywhere; word-break: break-word; font-weight: 600; }
+
+/* Keep Play button separated a bit */
+.play-wrap { margin-top: 8px; }
+
+.fab-collapse {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9999;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: none;
+  background: #0b5fff;
+  color: #fff;
+  font: 600 13px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  cursor: pointer;
+}
+.fab-collapse[hidden] { display: none; }
+
+
+.jj-more-results { margin-top: 12px; }
+.jj-more-results summary { cursor: pointer; font-weight: 600; margin: 8px 0; }
+.jj-more-container { margin-top: 8px; display: grid; gap: 12px; }
+
+
