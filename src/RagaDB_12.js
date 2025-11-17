@@ -48846,7 +48846,7 @@ export const RagaDB_12 = {
     "variations": {
       "Amrithavarshini1": {
         "arohanam": "S G3 M2 P N3 S",
-        "avarohanam": "S N3 P M2 G3 S S S R3 G3 M2 P D3 P S S N3 D3 P M2 G3 R3 S S G3 P N3 S S N3 D3 P M2 G3 S S R3 G3 M2 D3 N3 S S N3 D3 P M2 G3 R3 S"
+        "avarohanam": "S N3 P M2 G3 S"
       }
     }
   },
