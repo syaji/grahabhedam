@@ -256,6 +256,7 @@ function renderSelectedInfo(name) {
 
   let title = canon;
   let aroForPlay = "";
+  let avaForPlay = "";
   const lines = [];
 
   if (node.type === "janya") {
@@ -275,6 +276,7 @@ function renderSelectedInfo(name) {
     const aro = ensureAroEndsWithS(norm(node.arohanam));
     const ava = norm(node.avarohanam && node.avarohanam.trim() ? node.avarohanam : reverseAro(aro));
     aroForPlay = aro;
+    avaForPlay = ava;
     if (notes) lines.push(`<div><b>Notes:</b> ${notes}</div>`);
     lines.push(`<div><b>Arohanam:</b> ${aro}</div>`);
     lines.push(`<div><b>Avarohanam:</b> ${ava}</div>`);
@@ -289,7 +291,29 @@ function renderSelectedInfo(name) {
   `;
 
   const btn = $("#playSelected");
-  if (btn && aroForPlay) btn.onclick = () => playRaga(aroForPlay);
+
+  // We have aroForPlay (Arohanam) and avaForPlay (Avarohanam)
+  if (btn && aroForPlay && avaForPlay) {
+    btn.onclick = async () => {
+      try {
+        // Play Arohanam first
+        await playRaga(aroForPlay, "aro");
+  
+        // Small pause between the two
+        await new Promise(r => setTimeout(r, 600));
+  
+        // Then play Avarohanam
+        await playRaga(avaForPlay, "ava");
+      } catch (e) {
+        console.error("Playback error:", e);
+      }
+    };
+  } else if (btn && aroForPlay) {
+    // Fallback if Avarohanam missing
+    btn.onclick = () => playRaga(aroForPlay, "aro");
+  }
+  
+
 }
 
 function grahaResultCard(data) {
@@ -307,7 +331,21 @@ function grahaResultCard(data) {
     </div>
     <button class="playBtn">▶ Play</button>
   `;
-  el.querySelector(".playBtn").onclick = () => playRaga(aro);
+  el.querySelector(".playBtn").onclick = async () => {
+    try {
+      // Play Arohanam
+      await playRaga(aro, "aro");
+  
+      // If Avarohanam exists, play it second
+      if (ava && ava !== "—") {
+        await new Promise(r => setTimeout(r, 600));
+        await playRaga(ava, "ava");
+      }
+    } catch (e) {
+      console.error("Playback error:", e);
+    }
+  };
+  
   return el;
 }
 
@@ -470,7 +508,21 @@ function renderJanyasForJanaka(janakaName) {
     const btn = document.createElement("button");
     btn.className = "btn btn-primary";
     btn.textContent = "▶ Play";
-    btn.addEventListener("click", () => playRaga(aro));
+    btn.addEventListener("click", async () => {
+      try {
+        // Play Arohanam
+        await playRaga(aro, "aro");
+    
+        // If Avarohanam is present (DB-defined), play it afterward
+        if (ava && ava !== "—") {
+          await new Promise(r => setTimeout(r, 600));
+          await playRaga(ava, "ava");
+        }
+      } catch (e) {
+        console.error("Playback error:", e);
+      }
+    });
+    
     playWrap.appendChild(btn);
 
     body.appendChild(playWrap);

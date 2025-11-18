@@ -1,13 +1,10 @@
-// audioPlayer.js
-// Clean, patched, no-overlap version
+// ------------------------------------------------------------
+// ORIGINAL AUDIO PLAYER (Minimal patch: no clipping + correct S')
+// ------------------------------------------------------------
 
-// -------------------------------
-// GLOBALS
-// -------------------------------
 let audioCtx = null;
 let activeOscs = [];
 
-// Unlock audio for iOS
 export function unlockAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -17,7 +14,6 @@ export function unlockAudio() {
   }
 }
 
-// Stop all currently playing oscillators
 function stopAllOscillators() {
   activeOscs.forEach(o => {
     try { o.stop(0); } catch (_) {}
@@ -25,7 +21,6 @@ function stopAllOscillators() {
   activeOscs = [];
 }
 
-// Frequency map for Carnatic swaras
 const SWARA_SEMITONES = {
   S: 0,
   R1: 1, R2: 2, R3: 3,
@@ -36,38 +31,32 @@ const SWARA_SEMITONES = {
   N1: 9, N2: 10, N3: 11
 };
 
-// Convert swara → frequency
 function swaraToFreq(swara, baseFreq, isTopSa) {
   if (isTopSa) return baseFreq * 2;
-  let semi = SWARA_SEMITONES[swara];
-  if (semi === undefined) return null;
+
+  const semi = SWARA_SEMITONES[swara];
+  if (semi == null) return null;
+
   return baseFreq * Math.pow(2, semi / 12);
 }
 
-// -------------------------------
-// MAIN: PLAY RĀGA PROGRAMMATICALLY
-// -------------------------------
-export function playRaga(scaleString) {
+export function playRaga(scaleString, mode = "aro") {
   return new Promise(resolve => {
 
-    // Global audio context
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.state === "suspended") audioCtx.resume();
 
-    // Prevent overlap
     stopAllOscillators();
 
+    // Keep ALL tokens (unlimited notes)
     const notes = scaleString.trim().split(/\s+/);
-    const baseFreq = 261.63;   // Middle Sa ~ C
-    const noteDur = 0.45;      // seconds per note
+
+    const baseFreq = 261.63;
+    const noteDur = 0.45;
     let t = audioCtx.currentTime;
 
-    // Is this a full 7-swara Janaka?
-    const isJanaka = new Set(notes).size === 7;
-
-    // Helper: schedule one note
     function schedule(freq, time) {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -85,11 +74,24 @@ export function playRaga(scaleString) {
       activeOscs.push(osc);
     }
 
-    // -------------------------
-    // Ascending
-    // -------------------------
+    // ------------------------------------------------------------
+    // NEW: Determine which note should get S'
+    // ------------------------------------------------------------
+
     notes.forEach((s, i) => {
-      const isTopSa = (i > 0 && s === "S");
+
+      let isTopSa = false;
+
+      if (mode === "aro") {
+        // Arohanam: last S is high S'
+        isTopSa = (s === "S" && i === notes.length - 1);
+      }
+
+      if (mode === "ava") {
+        // Avarohanam: first S is high S'
+        isTopSa = (s === "S" && i === 0);
+      }
+
       const f = swaraToFreq(s, baseFreq, isTopSa);
       if (f) {
         schedule(f, t);
@@ -97,25 +99,10 @@ export function playRaga(scaleString) {
       }
     });
 
-
-    // -------------------------
-    // Descending
-    // -------------------------
-    const rev = [...notes].reverse();
-
-
-    rev.forEach((s, idx) => {
-      const isTopSa = (idx === 0 && s === "S");
-      const f = swaraToFreq(s, baseFreq, isTopSa);
-      if (f) {
-        schedule(f, t);
-        t += noteDur * 1.05;
-      }
-    });
-
-    // Resolve when playback finishes
-    const totalMs = (t - audioCtx.currentTime) * 1000;
-    setTimeout(resolve, totalMs);
+    setTimeout(resolve, (t - audioCtx.currentTime) * 1000);
   });
 }
+
+
+
 
